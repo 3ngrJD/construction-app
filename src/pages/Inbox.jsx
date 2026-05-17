@@ -1,8 +1,9 @@
 // ============================================
-// INBOX / CAPTURE SYSTEM
+// INBOX / CAPTURE SYSTEM - WITH SUPABASE
 // ============================================
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "../supabase"
 import { useProjects } from "../useProjects"
 
 // ============================================
@@ -119,21 +120,20 @@ function SendToModuleModal({ entry, projects, onConfirm, onClose }) {
     const base = {
       category: entry.category,
       project: entry.project || (projects[0]?.name || ""),
-      targetDate: entry.extractedDate || "",
-      description: entry.rawText,
+      targetDate: entry.extracted_date || "",
+      description: entry.raw_text,
     }
-
     if (entry.category === "Tasks") {
       return { ...base, priority: "Medium", status: "Not Started", area: "", nextAction: "", responsible: "", blockingItems: "", remarks: "" }
     }
     if (entry.category === "Materials") {
-      return { ...base, materialName: entry.rawText, unit: "", quantity: "", leadTime: "", supplier: "", requestStatus: "Not Started", neededOnSiteDate: entry.extractedDate || "", notes: "" }
+      return { ...base, materialName: entry.raw_text, unit: "", quantity: "", leadTime: "", supplier: "", requestStatus: "Not Started", notes: "" }
     }
     if (entry.category === "Plans") {
-      return { ...base, planType: entry.rawText, neededForActivity: "", status: "Not Requested", requestedFrom: "", revisionNumber: "", remarks: "" }
+      return { ...base, planType: entry.raw_text, neededForActivity: "", status: "Not Requested", requestedFrom: "", revisionNumber: "", remarks: "" }
     }
     if (entry.category === "Manpower") {
-      return { ...base, trade: "", allocated: 0, required: 0, date: entry.extractedDate || "", remarks: entry.rawText }
+      return { ...base, trade: "", allocated: 0, required: 0, date: entry.extracted_date || "", remarks: entry.raw_text }
     }
     return base
   })
@@ -161,7 +161,7 @@ function SendToModuleModal({ entry, projects, onConfirm, onClose }) {
           {/* Original Text */}
           <div className="bg-gray-800/50 rounded-lg p-3">
             <p className="text-gray-500 text-xs uppercase tracking-wider">Original Entry</p>
-            <p className="text-white text-sm mt-1">{entry.rawText}</p>
+            <p className="text-white text-sm mt-1">{entry.raw_text}</p>
           </div>
 
           {/* Category Selector */}
@@ -171,8 +171,7 @@ function SendToModuleModal({ entry, projects, onConfirm, onClose }) {
             </label>
             <div className="grid grid-cols-4 gap-2 mt-2">
               {["Tasks", "Materials", "Plans", "Manpower"].map(cat => (
-                <button
-                  key={cat}
+                <button key={cat}
                   onClick={() => setForm({ ...form, category: cat })}
                   className={`py-2 px-3 rounded-lg text-xs font-bold transition-colors ${
                     form.category === cat
@@ -201,7 +200,7 @@ function SendToModuleModal({ entry, projects, onConfirm, onClose }) {
           {/* Target Date */}
           <div>
             <label className="text-gray-400 text-xs uppercase tracking-wider">
-              Target Date {entry.extractedDate ? "(auto-detected)" : ""}
+              Target Date {entry.extracted_date ? "(auto-detected)" : ""}
             </label>
             <input type="date" name="targetDate" value={form.targetDate} onChange={handleChange}
               className="w-full mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400" />
@@ -390,9 +389,9 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
     }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <p className="text-white font-medium text-sm">{entry.rawText}</p>
+          <p className="text-white font-medium text-sm">{entry.raw_text}</p>
           <p className="text-gray-500 text-xs mt-1">
-            {new Date(entry.createdAt).toLocaleString()}
+            {new Date(entry.created_at).toLocaleString()}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
@@ -408,10 +407,10 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
             <p className="text-white text-xs font-medium">{entry.project}</p>
           </div>
         )}
-        {entry.extractedDate && (
+        {entry.extracted_date && (
           <div className="bg-gray-800/50 rounded-lg px-3 py-2">
             <p className="text-gray-500 text-xs">Detected Date</p>
-            <p className="text-yellow-400 text-xs font-medium">{entry.extractedDate}</p>
+            <p className="text-yellow-400 text-xs font-medium">{entry.extracted_date}</p>
           </div>
         )}
       </div>
@@ -420,14 +419,14 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
         <p className="text-gray-500 text-xs">Suggested Action</p>
         <p className="text-yellow-400 text-xs font-medium mt-1">
           → Send to {entry.category} module
-          {entry.extractedDate ? ` · Date: ${entry.extractedDate}` : ""}
+          {entry.extracted_date ? ` · Date: ${entry.extracted_date}` : ""}
         </p>
       </div>
 
-      {entry.sentTo && (
+      {entry.sent_to && (
         <div className="mt-3 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
           <p className="text-green-400 text-xs font-medium">
-            ✅ Sent to {entry.sentTo} module successfully
+            ✅ Sent to {entry.sent_to} module successfully
           </p>
         </div>
       )}
@@ -467,37 +466,8 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
 
 function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpower }) {
   const { projects } = useProjects()
-
-  const [entries, setEntries] = useState([
-    {
-      id: 1,
-      rawText: "Need rebar delivery for slab by Friday",
-      category: "Materials",
-      project: "Project Alpha",
-      extractedDate: "",
-      status: "New",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 2,
-      rawText: "Submit revised structural drawings to engineer",
-      category: "Plans",
-      project: "Project Beta",
-      extractedDate: "",
-      status: "New",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 3,
-      rawText: "Request 10 workers for masonry next week",
-      category: "Manpower",
-      project: "Project Gamma",
-      extractedDate: "",
-      status: "New",
-      createdAt: new Date().toISOString(),
-    },
-  ])
-
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
   const [rawInput, setRawInput] = useState("")
   const [selectedProject, setSelectedProject] = useState("")
   const [filterStatus, setFilterStatus] = useState("New")
@@ -505,28 +475,50 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
   const [isProcessing, setIsProcessing] = useState(false)
   const [sendToEntry, setSendToEntry] = useState(null)
 
-  // Update selectedProject once projects load
   const defaultProject = projects[0]?.name || ""
 
-  const handleCapture = () => {
+  useEffect(() => {
+    fetchEntries()
+  }, [])
+
+  const fetchEntries = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from("inbox")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching inbox:", error)
+    } else {
+      setEntries(data)
+    }
+    setLoading(false)
+  }
+
+  const handleCapture = async () => {
     if (!rawInput.trim()) return
     setIsProcessing(true)
-    setTimeout(() => {
-      const category = classifyEntry(rawInput)
-      const extractedDate = extractDate(rawInput)
-      const newEntry = {
-        id: Date.now(),
-        rawText: rawInput.trim(),
-        category,
-        project: selectedProject || defaultProject,
-        extractedDate,
-        status: "New",
-        createdAt: new Date().toISOString(),
-      }
-      setEntries(prev => [newEntry, ...prev])
+
+    const category = classifyEntry(rawInput)
+    const extractedDate = extractDate(rawInput)
+    const project = selectedProject || defaultProject
+
+    const { error } = await supabase.from("inbox").insert([{
+      raw_text: rawInput.trim(),
+      category,
+      project,
+      extracted_date: extractedDate || null,
+      status: "New",
+    }])
+
+    if (error) {
+      console.error("Error saving inbox entry:", error)
+    } else {
+      await fetchEntries()
       setRawInput("")
-      setIsProcessing(false)
-    }, 600)
+    }
+    setIsProcessing(false)
   }
 
   const handleKeyDown = (e) => {
@@ -538,12 +530,11 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
 
   const handleSendTo = (entry) => setSendToEntry(entry)
 
-  const handleConfirmSend = (form) => {
+  const handleConfirmSend = async (form) => {
     const category = form.category
 
     if (category === "Tasks" && onSendToTasks) {
       onSendToTasks({
-        id: Date.now(),
         project: form.project,
         area: form.area || "",
         activity: form.description,
@@ -557,23 +548,17 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
         responsible: form.responsible || "",
         remarks: "",
         dateType: form.targetDate ? "Fixed Date" : "No Deadline",
-        createdDate: new Date().toISOString().split("T")[0],
-        updatedDate: new Date().toISOString().split("T")[0],
       })
     }
 
     if (category === "Materials" && onSendToMaterials) {
       onSendToMaterials({
-        id: Date.now(),
         project: form.project,
         materialName: form.materialName || form.description,
         unit: form.unit || "",
         quantity: form.quantity || "",
         neededOnSiteDate: form.targetDate || "",
         leadTime: form.leadTime || "",
-        requestPrepDate: "",
-        requestStatus: "Not Started",
-        deliveryDate: "",
         supplier: form.supplier || "",
         notes: "",
       })
@@ -581,7 +566,6 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
 
     if (category === "Plans" && onSendToPlans) {
       onSendToPlans({
-        id: Date.now(),
         project: form.project,
         planType: form.planType || form.description,
         neededForActivity: form.neededForActivity || "",
@@ -595,7 +579,6 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
 
     if (category === "Manpower" && onSendToManpower) {
       onSendToManpower({
-        id: Date.now(),
         project: form.project,
         trade: form.trade || "",
         allocated: form.allocated || 0,
@@ -605,26 +588,46 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
       })
     }
 
-    setEntries(entries.map(e => e.id === sendToEntry.id
-      ? { ...e, status: "Processed", sentTo: category }
-      : e
-    ))
+    // Update entry status in Supabase
+    const { error } = await supabase
+      .from("inbox")
+      .update({ status: "Processed", sent_to: category })
+      .eq("id", sendToEntry.id)
+
+    if (error) console.error("Error updating inbox entry:", error)
+    else await fetchEntries()
+
     setSendToEntry(null)
   }
 
-  const handleDismiss = (id) => {
-    setEntries(entries.map(e => e.id === id ? { ...e, status: "Dismissed" } : e))
+  const handleDismiss = async (id) => {
+    const { error } = await supabase
+      .from("inbox")
+      .update({ status: "Dismissed" })
+      .eq("id", id)
+    if (error) console.error("Error dismissing entry:", error)
+    else await fetchEntries()
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm("Delete this entry?")) {
-      setEntries(entries.filter(e => e.id !== id))
+      const { error } = await supabase
+        .from("inbox")
+        .delete()
+        .eq("id", id)
+      if (error) console.error("Error deleting entry:", error)
+      else await fetchEntries()
     }
   }
 
-  const handleClearProcessed = () => {
+  const handleClearProcessed = async () => {
     if (window.confirm("Clear all processed and dismissed entries?")) {
-      setEntries(entries.filter(e => e.status === "New"))
+      const { error } = await supabase
+        .from("inbox")
+        .delete()
+        .in("status", ["Processed", "Dismissed"])
+      if (error) console.error("Error clearing entries:", error)
+      else await fetchEntries()
     }
   }
 
@@ -705,7 +708,7 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
           <button onClick={handleCapture}
             disabled={!rawInput.trim() || isProcessing}
             className="flex-1 bg-yellow-400 text-gray-900 font-bold px-6 py-2 rounded-lg text-sm hover:bg-yellow-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {isProcessing ? "⚡ Classifying..." : "⚡ Capture"}
+            {isProcessing ? "⚡ Saving..." : "⚡ Capture"}
           </button>
         </div>
 
@@ -763,24 +766,35 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
         ))}
       </div>
 
+      {/* Loading */}
+      {loading && (
+        <div className="text-center py-10">
+          <p className="text-yellow-400 animate-pulse">⚡ Loading inbox...</p>
+        </div>
+      )}
+
       {/* Entries */}
-      <div className="space-y-3">
-        {filteredEntries.length === 0 && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-10 text-center">
-            <p className="text-gray-500 text-sm">No entries found.</p>
-            <p className="text-gray-600 text-xs mt-1">Use the Quick Capture box above to add your first entry.</p>
-          </div>
-        )}
-        {filteredEntries.map(entry => (
-          <InboxCard
-            key={entry.id}
-            entry={entry}
-            onSendTo={handleSendTo}
-            onDismiss={handleDismiss}
-            onDelete={handleDelete}
-          />
-        ))}
-      </div>
+      {!loading && (
+        <div className="space-y-3">
+          {filteredEntries.length === 0 && (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-10 text-center">
+              <p className="text-gray-500 text-sm">No entries found.</p>
+              <p className="text-gray-600 text-xs mt-1">
+                Use the Quick Capture box above to add your first entry.
+              </p>
+            </div>
+          )}
+          {filteredEntries.map(entry => (
+            <InboxCard
+              key={entry.id}
+              entry={entry}
+              onSendTo={handleSendTo}
+              onDismiss={handleDismiss}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Send To Modal */}
       {sendToEntry && (
