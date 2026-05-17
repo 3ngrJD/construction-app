@@ -11,6 +11,7 @@ import Plans from "./pages/Plans"
 import Manpower from "./pages/Manpower"
 import Lookahead from "./pages/Lookahead"
 import Inbox from "./pages/Inbox"
+import Projects from "./pages/Projects"
 
 function App() {
   const [activePage, setActivePage] = useState("dashboard")
@@ -46,6 +47,8 @@ function App() {
     switch (activePage) {
       case "dashboard":
         return <Dashboard />
+      case "projects":
+        return <Projects />
       case "tasks":
         return <Tasks inboxTasks={tasks} />
       case "materials":

@@ -3,7 +3,7 @@
 // ============================================
 
 import { useState } from "react"
-import { projects } from "../data/store"
+import { useProjects } from "../useProjects"
 
 // ============================================
 // AUTO CLASSIFIER
@@ -114,16 +114,15 @@ function StatusBadge({ status }) {
 // SEND TO MODULE MODAL
 // ============================================
 
-function SendToModuleModal({ entry, onConfirm, onClose }) {
+function SendToModuleModal({ entry, projects, onConfirm, onClose }) {
   const [form, setForm] = useState(() => {
     const base = {
       category: entry.category,
-      project: entry.project,
+      project: entry.project || (projects[0]?.name || ""),
       targetDate: entry.extractedDate || "",
       description: entry.rawText,
     }
 
-    // Pre-fill fields based on category
     if (entry.category === "Tasks") {
       return { ...base, priority: "Medium", status: "Not Started", area: "", nextAction: "", responsible: "", blockingItems: "", remarks: "" }
     }
@@ -142,10 +141,6 @@ function SendToModuleModal({ entry, onConfirm, onClose }) {
   const handleChange = (e) => {
     const value = e.target.type === "number" ? parseInt(e.target.value) || 0 : e.target.value
     setForm({ ...form, [e.target.name]: value })
-  }
-
-  const handleSubmit = () => {
-    onConfirm(form)
   }
 
   return (
@@ -169,7 +164,7 @@ function SendToModuleModal({ entry, onConfirm, onClose }) {
             <p className="text-white text-sm mt-1">{entry.rawText}</p>
           </div>
 
-          {/* Category Selector — KEY FIX */}
+          {/* Category Selector */}
           <div>
             <label className="text-gray-400 text-xs uppercase tracking-wider">
               Category — Change if misclassified
@@ -197,7 +192,9 @@ function SendToModuleModal({ entry, onConfirm, onClose }) {
             <label className="text-gray-400 text-xs uppercase tracking-wider">Project</label>
             <select name="project" value={form.project} onChange={handleChange}
               className="w-full mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400">
-              {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+              {(projects || []).map(p => (
+                <option key={p.id} value={p.name}>{p.name}</option>
+              ))}
             </select>
           </div>
 
@@ -210,7 +207,7 @@ function SendToModuleModal({ entry, onConfirm, onClose }) {
               className="w-full mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400" />
           </div>
 
-          {/* ---- TASKS FIELDS ---- */}
+          {/* TASKS FIELDS */}
           {form.category === "Tasks" && (
             <>
               <div>
@@ -263,7 +260,7 @@ function SendToModuleModal({ entry, onConfirm, onClose }) {
             </>
           )}
 
-          {/* ---- MATERIALS FIELDS ---- */}
+          {/* MATERIALS FIELDS */}
           {form.category === "Materials" && (
             <>
               <div>
@@ -303,7 +300,7 @@ function SendToModuleModal({ entry, onConfirm, onClose }) {
             </>
           )}
 
-          {/* ---- PLANS FIELDS ---- */}
+          {/* PLANS FIELDS */}
           {form.category === "Plans" && (
             <>
               <div>
@@ -329,7 +326,7 @@ function SendToModuleModal({ entry, onConfirm, onClose }) {
             </>
           )}
 
-          {/* ---- MANPOWER FIELDS ---- */}
+          {/* MANPOWER FIELDS */}
           {form.category === "Manpower" && (
             <>
               <div>
@@ -369,7 +366,7 @@ function SendToModuleModal({ entry, onConfirm, onClose }) {
             className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors">
             Cancel
           </button>
-          <button onClick={handleSubmit}
+          <button onClick={() => onConfirm(form)}
             className="px-6 py-2 text-sm bg-yellow-400 text-gray-900 font-bold rounded-lg hover:bg-yellow-300 transition-colors">
             📤 Send to {form.category}
           </button>
@@ -391,8 +388,6 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
       entry.status === "Processed" ? "border-green-500/20 opacity-60" :
       "border-gray-800 opacity-40"
     }`}>
-
-      {/* Top Row */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-white font-medium text-sm">{entry.rawText}</p>
@@ -406,7 +401,6 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
         </div>
       </div>
 
-      {/* Parsed Info */}
       <div className="mt-3 grid grid-cols-2 gap-3">
         {entry.project && (
           <div className="bg-gray-800/50 rounded-lg px-3 py-2">
@@ -422,7 +416,6 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
         )}
       </div>
 
-      {/* Suggested Action */}
       <div className="mt-3 bg-gray-800/30 rounded-lg px-3 py-2">
         <p className="text-gray-500 text-xs">Suggested Action</p>
         <p className="text-yellow-400 text-xs font-medium mt-1">
@@ -431,7 +424,6 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
         </p>
       </div>
 
-      {/* Sent To Confirmation */}
       {entry.sentTo && (
         <div className="mt-3 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
           <p className="text-green-400 text-xs font-medium">
@@ -440,21 +432,17 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
         </div>
       )}
 
-      {/* Actions */}
       {entry.status === "New" && (
         <div className="flex items-center gap-3 mt-4">
-          <button
-            onClick={() => onSendTo(entry)}
+          <button onClick={() => onSendTo(entry)}
             className="flex-1 bg-yellow-400 text-gray-900 font-bold px-4 py-2 rounded-lg text-xs hover:bg-yellow-300 transition-colors">
             📤 Review & Send to Module
           </button>
-          <button
-            onClick={() => onDismiss(entry.id)}
+          <button onClick={() => onDismiss(entry.id)}
             className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors">
             Dismiss
           </button>
-          <button
-            onClick={() => onDelete(entry.id)}
+          <button onClick={() => onDelete(entry.id)}
             className="px-3 py-2 text-xs text-red-400 hover:text-red-300 transition-colors">
             🗑️
           </button>
@@ -463,14 +451,12 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
 
       {entry.status !== "New" && (
         <div className="flex justify-end mt-3">
-          <button
-            onClick={() => onDelete(entry.id)}
+          <button onClick={() => onDelete(entry.id)}
             className="text-xs text-red-400 hover:text-red-300 transition-colors">
             🗑️ Delete
           </button>
         </div>
       )}
-
     </div>
   )
 }
@@ -480,12 +466,14 @@ function InboxCard({ entry, onSendTo, onDismiss, onDelete }) {
 // ============================================
 
 function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpower }) {
+  const { projects } = useProjects()
+
   const [entries, setEntries] = useState([
     {
       id: 1,
       rawText: "Need rebar delivery for slab by Friday",
       category: "Materials",
-      project: projects[0].name,
+      project: "Project Alpha",
       extractedDate: "",
       status: "New",
       createdAt: new Date().toISOString(),
@@ -494,7 +482,7 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
       id: 2,
       rawText: "Submit revised structural drawings to engineer",
       category: "Plans",
-      project: projects[1].name,
+      project: "Project Beta",
       extractedDate: "",
       status: "New",
       createdAt: new Date().toISOString(),
@@ -503,7 +491,7 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
       id: 3,
       rawText: "Request 10 workers for masonry next week",
       category: "Manpower",
-      project: projects[2].name,
+      project: "Project Gamma",
       extractedDate: "",
       status: "New",
       createdAt: new Date().toISOString(),
@@ -511,13 +499,15 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
   ])
 
   const [rawInput, setRawInput] = useState("")
-  const [selectedProject, setSelectedProject] = useState(projects[0].name)
+  const [selectedProject, setSelectedProject] = useState("")
   const [filterStatus, setFilterStatus] = useState("New")
   const [filterCategory, setFilterCategory] = useState("All")
   const [isProcessing, setIsProcessing] = useState(false)
   const [sendToEntry, setSendToEntry] = useState(null)
 
-  // Add new entry
+  // Update selectedProject once projects load
+  const defaultProject = projects[0]?.name || ""
+
   const handleCapture = () => {
     if (!rawInput.trim()) return
     setIsProcessing(true)
@@ -528,7 +518,7 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
         id: Date.now(),
         rawText: rawInput.trim(),
         category,
-        project: selectedProject,
+        project: selectedProject || defaultProject,
         extractedDate,
         status: "New",
         createdAt: new Date().toISOString(),
@@ -546,16 +536,11 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
     }
   }
 
-  // Open send to modal
-  const handleSendTo = (entry) => {
-    setSendToEntry(entry)
-  }
+  const handleSendTo = (entry) => setSendToEntry(entry)
 
-  // Confirm send to module
   const handleConfirmSend = (form) => {
     const category = form.category
 
-    // Build the correct record for each module
     if (category === "Tasks" && onSendToTasks) {
       onSendToTasks({
         id: Date.now(),
@@ -620,7 +605,6 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
       })
     }
 
-    // Mark entry as processed
     setEntries(entries.map(e => e.id === sendToEntry.id
       ? { ...e, status: "Processed", sentTo: category }
       : e
@@ -710,9 +694,13 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
 
         {/* Project & Submit */}
         <div className="flex items-center gap-3 mt-3">
-          <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}
+          <select
+            value={selectedProject || defaultProject}
+            onChange={e => setSelectedProject(e.target.value)}
             className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400">
-            {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+            {(projects || []).map(p => (
+              <option key={p.id} value={p.name}>{p.name}</option>
+            ))}
           </select>
           <button onClick={handleCapture}
             disabled={!rawInput.trim() || isProcessing}
@@ -798,6 +786,7 @@ function Inbox({ onSendToTasks, onSendToMaterials, onSendToPlans, onSendToManpow
       {sendToEntry && (
         <SendToModuleModal
           entry={sendToEntry}
+          projects={projects}
           onConfirm={handleConfirmSend}
           onClose={() => setSendToEntry(null)}
         />

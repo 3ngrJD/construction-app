@@ -4,13 +4,14 @@
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: "⚡" },
+  { id: "projects", label: "Projects", icon: "🏢" },
   { id: "tasks", label: "Master Tasks", icon: "✅" },
   { id: "materials", label: "Materials", icon: "🏗️" },
   { id: "plans", label: "Plans & Drawings", icon: "📐" },
   { id: "manpower", label: "Manpower", icon: "👷" },
   { id: "lookahead", label: "Two-Week Lookahead", icon: "📅" },
   { id: "inbox", label: "Inbox / Capture", icon: "📥" },
-];
+]
 
 function Sidebar({ activePage, setActivePage }) {
   return (

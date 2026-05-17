@@ -1,9 +1,10 @@
 // ============================================
-// MASTER TASKS MODULE
+// MASTER TASKS MODULE - WITH SUPABASE
 // ============================================
 
 import { useState, useEffect } from "react"
-import { initialTasks, projects } from "../data/store"
+import { supabase } from "../supabase"
+import { useProjects } from "../useProjects"
 
 // ============================================
 // PRIORITY SCORE CALCULATOR
@@ -78,7 +79,7 @@ function StatusBadge({ status }) {
 // ADD/EDIT TASK MODAL
 // ============================================
 
-function TaskModal({ task, onSave, onClose }) {
+function TaskModal({ task, projects, onSave, onClose }) {
   const [form, setForm] = useState(task || {
     project: projects[0].name,
     area: "",
@@ -108,19 +109,11 @@ function TaskModal({ task, onSave, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-
-        {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-800">
-          <h2 className="text-white font-bold text-lg">
-            {task ? "✏️ Edit Task" : "➕ Add New Task"}
-          </h2>
+          <h2 className="text-white font-bold text-lg">{task ? "✏️ Edit Task" : "➕ Add New Task"}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">✕</button>
         </div>
-
-        {/* Modal Body */}
         <div className="p-6 space-y-4">
-
-          {/* Project & Area */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-gray-400 text-xs uppercase tracking-wider">Project *</label>
@@ -135,15 +128,11 @@ function TaskModal({ task, onSave, onClose }) {
                 className="w-full mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400" />
             </div>
           </div>
-
-          {/* Activity */}
           <div>
             <label className="text-gray-400 text-xs uppercase tracking-wider">Activity Description *</label>
             <input name="activity" value={form.activity} onChange={handleChange} placeholder="e.g. Pour concrete slab"
               className="w-full mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400" />
           </div>
-
-          {/* Priority & Status */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-gray-400 text-xs uppercase tracking-wider">Priority</label>
@@ -166,8 +155,6 @@ function TaskModal({ task, onSave, onClose }) {
               </select>
             </div>
           </div>
-
-          {/* Dates */}
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-gray-400 text-xs uppercase tracking-wider">Start Date</label>
@@ -190,8 +177,6 @@ function TaskModal({ task, onSave, onClose }) {
               </select>
             </div>
           </div>
-
-          {/* Blocking Items & Dependencies */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-gray-400 text-xs uppercase tracking-wider">Blocking Items</label>
@@ -204,8 +189,6 @@ function TaskModal({ task, onSave, onClose }) {
                 className="w-full mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400" />
             </div>
           </div>
-
-          {/* Next Action & Responsible */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-gray-400 text-xs uppercase tracking-wider">Next Action</label>
@@ -218,18 +201,13 @@ function TaskModal({ task, onSave, onClose }) {
                 className="w-full mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400" />
             </div>
           </div>
-
-          {/* Remarks */}
           <div>
             <label className="text-gray-400 text-xs uppercase tracking-wider">Remarks</label>
             <textarea name="remarks" value={form.remarks} onChange={handleChange} placeholder="Additional notes..."
               rows={3}
               className="w-full mt-1 bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 resize-none" />
           </div>
-
         </div>
-
-        {/* Modal Footer */}
         <div className="flex justify-end gap-3 p-6 border-t border-gray-800">
           <button onClick={onClose}
             className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-gray-700 rounded-lg transition-colors">
@@ -240,7 +218,6 @@ function TaskModal({ task, onSave, onClose }) {
             {task ? "Save Changes" : "Add Task"}
           </button>
         </div>
-
       </div>
     </div>
   )
@@ -251,19 +228,9 @@ function TaskModal({ task, onSave, onClose }) {
 // ============================================
 
 function Tasks({ inboxTasks = [] }) {
-  const [tasks, setTasks] = useState(
-    initialTasks.map(t => ({ ...t, score: calculatePriorityScore(t) }))
-  )
-
-  // Merge inbox tasks when they arrive
-  useEffect(() => {
-    if (inboxTasks.length > 0) {
-      setTasks(prev => [
-        ...prev,
-        ...inboxTasks.map(t => ({ ...t, score: calculatePriorityScore(t) }))
-      ])
-    }
-  }, [inboxTasks])
+  const { projects } = useProjects()
+  const [tasks, setTasks] = useState([])
+  const [loading, setLoading] = useState(true)
   const [selectedProject, setSelectedProject] = useState("All")
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [selectedPriority, setSelectedPriority] = useState("All")
@@ -272,7 +239,127 @@ function Tasks({ inboxTasks = [] }) {
   const [editingTask, setEditingTask] = useState(null)
   const [sortBy, setSortBy] = useState("score")
 
-  // Filtering
+  // ── Load tasks from Supabase ──
+  useEffect(() => {
+    fetchTasks()
+  }, [])
+
+  // ── Merge inbox tasks ──
+  useEffect(() => {
+    if (inboxTasks.length > 0) {
+      inboxTasks.forEach(task => saveTask(task))
+    }
+  }, [inboxTasks])
+
+  const fetchTasks = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .order("created_date", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching tasks:", error)
+    } else {
+      const mapped = data.map(t => ({
+        id: t.id,
+        project: t.project,
+        area: t.area || "",
+        activity: t.activity,
+        priority: t.priority,
+        status: t.status,
+        startDate: t.start_date || "",
+        targetDate: t.target_date || "",
+        blockingItems: t.blocking_items || "",
+        dependencies: t.dependencies || "",
+        nextAction: t.next_action || "",
+        responsible: t.responsible || "",
+        remarks: t.remarks || "",
+        dateType: t.date_type || "Fixed Date",
+        score: calculatePriorityScore({
+          targetDate: t.target_date,
+          priority: t.priority,
+          blockingItems: t.blocking_items,
+          status: t.status,
+        }),
+      }))
+      setTasks(mapped)
+    }
+    setLoading(false)
+  }
+
+  const saveTask = async (form) => {
+    const { error } = await supabase.from("tasks").insert([{
+      project: form.project,
+      area: form.area || "",
+      activity: form.activity,
+      priority: form.priority || "Medium",
+      status: form.status || "Not Started",
+      start_date: form.startDate || null,
+      target_date: form.targetDate || null,
+      blocking_items: form.blockingItems || "",
+      dependencies: form.dependencies || "",
+      next_action: form.nextAction || "",
+      responsible: form.responsible || "",
+      remarks: form.remarks || "",
+      date_type: form.dateType || "Fixed Date",
+    }])
+    if (error) console.error("Error saving task:", error)
+    else fetchTasks()
+  }
+
+  const handleAddTask = async (form) => {
+    await saveTask(form)
+    setShowModal(false)
+  }
+
+  const handleEditTask = async (form) => {
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        project: form.project,
+        area: form.area || "",
+        activity: form.activity,
+        priority: form.priority,
+        status: form.status,
+        start_date: form.startDate || null,
+        target_date: form.targetDate || null,
+        blocking_items: form.blockingItems || "",
+        dependencies: form.dependencies || "",
+        next_action: form.nextAction || "",
+        responsible: form.responsible || "",
+        remarks: form.remarks || "",
+        date_type: form.dateType || "Fixed Date",
+        updated_date: new Date().toISOString(),
+      })
+      .eq("id", editingTask.id)
+
+    if (error) console.error("Error updating task:", error)
+    else {
+      fetchTasks()
+      setEditingTask(null)
+      setShowModal(false)
+    }
+  }
+
+  const handleDeleteTask = async (id) => {
+    if (window.confirm("Delete this task?")) {
+      const { error } = await supabase.from("tasks").delete().eq("id", id)
+      if (error) console.error("Error deleting task:", error)
+      else fetchTasks()
+    }
+  }
+
+  const handleMarkDone = async (id) => {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: "Done", updated_date: new Date().toISOString() })
+      .eq("id", id)
+    if (error) console.error("Error marking done:", error)
+    else fetchTasks()
+  }
+
+  // ── Filter and sort ──
   const filteredTasks = tasks
     .filter(t => selectedProject === "All" ? true : t.project === selectedProject)
     .filter(t => selectedStatus === "All" ? true : t.status === selectedStatus)
@@ -280,7 +367,7 @@ function Tasks({ inboxTasks = [] }) {
     .filter(t => searchQuery === "" ? true :
       t.activity.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.project.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.responsible.toLowerCase().includes(searchQuery.toLowerCase())
+      (t.responsible || "").toLowerCase().includes(searchQuery.toLowerCase())
     )
     .filter(t => t.status !== "Done")
     .sort((a, b) => {
@@ -292,41 +379,6 @@ function Tasks({ inboxTasks = [] }) {
       }
       return 0
     })
-
-  // Add Task
-  const handleAddTask = (form) => {
-    const newTask = {
-      ...form,
-      id: Date.now(),
-      score: calculatePriorityScore(form),
-      createdDate: new Date().toISOString().split("T")[0],
-      updatedDate: new Date().toISOString().split("T")[0],
-    }
-    setTasks([...tasks, newTask])
-    setShowModal(false)
-  }
-
-  // Edit Task
-  const handleEditTask = (form) => {
-    setTasks(tasks.map(t => t.id === editingTask.id
-      ? { ...form, id: t.id, score: calculatePriorityScore(form), updatedDate: new Date().toISOString().split("T")[0] }
-      : t
-    ))
-    setEditingTask(null)
-    setShowModal(false)
-  }
-
-  // Delete Task
-  const handleDeleteTask = (id) => {
-    if (window.confirm("Delete this task?")) {
-      setTasks(tasks.filter(t => t.id !== id))
-    }
-  }
-
-  // Mark Done
-  const handleMarkDone = (id) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, status: "Done" } : t))
-  }
 
   return (
     <div className="p-6 space-y-6">
@@ -344,137 +396,140 @@ function Tasks({ inboxTasks = [] }) {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <input
-          placeholder="🔍 Search tasks..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="lg:col-span-2 bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-yellow-400"
-        />
-        <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}
-          className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400">
-          <option value="All">All Projects</option>
-          {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-        </select>
-        <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}
-          className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400">
-          <option value="All">All Statuses</option>
-          <option>Not Started</option>
-          <option>Ongoing</option>
-          <option>Pending</option>
-          <option>On Hold</option>
-        </select>
-        <select value={selectedPriority} onChange={e => setSelectedPriority(e.target.value)}
-          className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400">
-          <option value="All">All Priorities</option>
-          <option>High</option>
-          <option>Medium</option>
-          <option>Low</option>
-        </select>
-      </div>
-
-      {/* Sort Bar */}
-      <div className="flex items-center gap-3">
-        <span className="text-gray-500 text-xs uppercase tracking-wider">Sort by:</span>
-        {["score", "targetDate", "priority"].map(s => (
-          <button key={s} onClick={() => setSortBy(s)}
-            className={`text-xs px-3 py-1 rounded-full transition-colors ${sortBy === s ? "bg-yellow-400 text-gray-900 font-bold" : "bg-gray-800 text-gray-400 hover:text-white"}`}>
-            {s === "score" ? "Priority Score" : s === "targetDate" ? "Target Date" : "Priority Level"}
-          </button>
-        ))}
-      </div>
-
-      {/* Tasks Table */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-                <th className="text-left px-4 py-3">Score</th>
-                <th className="text-left px-4 py-3">Project</th>
-                <th className="text-left px-4 py-3">Activity</th>
-                <th className="text-left px-4 py-3">Priority</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Target Date</th>
-                <th className="text-left px-4 py-3">Days Left</th>
-                <th className="text-left px-4 py-3">Next Action</th>
-                <th className="text-left px-4 py-3">Responsible</th>
-                <th className="text-left px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTasks.length === 0 && (
-                <tr>
-                  <td colSpan={10} className="text-center text-gray-500 py-10">
-                    No tasks found. Add your first task!
-                  </td>
-                </tr>
-              )}
-              {filteredTasks.map((task, index) => (
-                <tr key={task.id}
-                  className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors ${index % 2 === 0 ? "bg-gray-900" : "bg-gray-800/20"}`}>
-                  <td className="px-4 py-3">
-                    <span className="text-yellow-400 font-bold">{task.score}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-gray-300 text-xs">{task.project}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="text-white font-medium">{task.activity}</p>
-                      {task.area && <p className="text-gray-500 text-xs">{task.area}</p>}
-                      {task.blockingItems && (
-                        <p className="text-red-400 text-xs mt-1">⚠ {task.blockingItems}</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3"><PriorityBadge priority={task.priority} /></td>
-                  <td className="px-4 py-3"><StatusBadge status={task.status} /></td>
-                  <td className="px-4 py-3">
-                    <span className="text-gray-300 text-xs">{task.targetDate || "—"}</span>
-                  </td>
-                  <td className="px-4 py-3"><DaysBadge targetDate={task.targetDate} /></td>
-                  <td className="px-4 py-3">
-                    <span className="text-gray-400 text-xs">{task.nextAction || "—"}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-gray-400 text-xs">{task.responsible || "—"}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => { setEditingTask(task); setShowModal(true) }}
-                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleMarkDone(task.id)}
-                        className="text-xs text-green-400 hover:text-green-300 transition-colors">
-                        ✅
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTask(task.id)}
-                        className="text-xs text-red-400 hover:text-red-300 transition-colors">
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Loading */}
+      {loading && (
+        <div className="text-center py-20">
+          <p className="text-yellow-400 text-lg animate-pulse">⚡ Loading tasks...</p>
         </div>
-      </div>
+      )}
+
+      {!loading && (
+        <>
+          {/* Filters */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <input
+              placeholder="🔍 Search tasks..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="lg:col-span-2 bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-yellow-400"
+            />
+            <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}
+              className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400">
+              <option value="All">All Projects</option>
+              {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+            </select>
+            <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}
+              className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400">
+              <option value="All">All Statuses</option>
+              <option>Not Started</option>
+              <option>Ongoing</option>
+              <option>Pending</option>
+              <option>On Hold</option>
+            </select>
+            <select value={selectedPriority} onChange={e => setSelectedPriority(e.target.value)}
+              className="bg-gray-800 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400">
+              <option value="All">All Priorities</option>
+              <option>High</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select>
+          </div>
+
+          {/* Sort Bar */}
+          <div className="flex items-center gap-3">
+            <span className="text-gray-500 text-xs uppercase tracking-wider">Sort by:</span>
+            {["score", "targetDate", "priority"].map(s => (
+              <button key={s} onClick={() => setSortBy(s)}
+                className={`text-xs px-3 py-1 rounded-full transition-colors ${sortBy === s ? "bg-yellow-400 text-gray-900 font-bold" : "bg-gray-800 text-gray-400 hover:text-white"}`}>
+                {s === "score" ? "Priority Score" : s === "targetDate" ? "Target Date" : "Priority Level"}
+              </button>
+            ))}
+          </div>
+
+          {/* Tasks Table */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+                    <th className="text-left px-4 py-3">Score</th>
+                    <th className="text-left px-4 py-3">Project</th>
+                    <th className="text-left px-4 py-3">Activity</th>
+                    <th className="text-left px-4 py-3">Priority</th>
+                    <th className="text-left px-4 py-3">Status</th>
+                    <th className="text-left px-4 py-3">Target Date</th>
+                    <th className="text-left px-4 py-3">Days Left</th>
+                    <th className="text-left px-4 py-3">Next Action</th>
+                    <th className="text-left px-4 py-3">Responsible</th>
+                    <th className="text-left px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTasks.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="text-center text-gray-500 py-10">
+                        No tasks found. Add your first task!
+                      </td>
+                    </tr>
+                  )}
+                  {filteredTasks.map((task, index) => (
+                    <tr key={task.id}
+                      className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors ${index % 2 === 0 ? "bg-gray-900" : "bg-gray-800/20"}`}>
+                      <td className="px-4 py-3">
+                        <span className="text-yellow-400 font-bold">{task.score}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-300 text-xs">{task.project}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="text-white font-medium">{task.activity}</p>
+                          {task.area && <p className="text-gray-500 text-xs">{task.area}</p>}
+                          {task.blockingItems && (
+                            <p className="text-red-400 text-xs mt-1">⚠ {task.blockingItems}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3"><PriorityBadge priority={task.priority} /></td>
+                      <td className="px-4 py-3"><StatusBadge status={task.status} /></td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-300 text-xs">{task.targetDate || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3"><DaysBadge targetDate={task.targetDate} /></td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-400 text-xs">{task.nextAction || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-gray-400 text-xs">{task.responsible || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => { setEditingTask(task); setShowModal(true) }}
+                            className="text-xs text-blue-400 hover:text-blue-300 transition-colors">✏️</button>
+                          <button onClick={() => handleMarkDone(task.id)}
+                            className="text-xs text-green-400 hover:text-green-300 transition-colors">✅</button>
+                          <button onClick={() => handleDeleteTask(task.id)}
+                            className="text-xs text-red-400 hover:text-red-300 transition-colors">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Modal */}
       {showModal && (
-        <TaskModal
-          task={editingTask}
-          onSave={editingTask ? handleEditTask : handleAddTask}
-          onClose={() => { setShowModal(false); setEditingTask(null) }}
-        />
-      )}
+  <TaskModal
+    task={editingTask}
+    projects={projects}
+    onSave={editingTask ? handleEditTask : handleAddTask}
+    onClose={() => { setShowModal(false); setEditingTask(null) }}
+  />
+)}
 
     </div>
   )

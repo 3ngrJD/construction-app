@@ -3,8 +3,8 @@
 // ============================================
 
 import { useState } from "react"
-import { initialTasks, initialMaterials, initialPlans, initialManpower, projects } from "../data/store"
-
+import { initialTasks, initialMaterials, initialPlans, initialManpower } from "../data/store"
+import { useProjects } from "../useProjects"
 // ============================================
 // PRIORITY SCORING ENGINE
 // ============================================
@@ -112,6 +112,7 @@ function DaysBadge({ targetDate }) {
 // ============================================
 
 function Dashboard() {
+  const { projects } = useProjects()
   const [selectedProject, setSelectedProject] = useState("All")
   const today = new Date()
 

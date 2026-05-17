@@ -3,7 +3,8 @@
 // ============================================
 
 import { useState } from "react"
-import { initialTasks, initialMaterials, initialPlans, projects } from "../data/store"
+import { initialTasks, initialMaterials, initialPlans } from "../data/store"
+import { useProjects } from "../useProjects"
 
 // ============================================
 // PRIORITY SCORE CALCULATOR
@@ -108,6 +109,7 @@ function DateHeader({ date }) {
 // ============================================
 
 function Lookahead() {
+  const { projects } = useProjects()
   const [selectedProject, setSelectedProject] = useState("All")
   const today = new Date()
 
